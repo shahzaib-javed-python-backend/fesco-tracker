@@ -44,7 +44,7 @@ A production-grade Python backend for tracking live electricity bills across 10 
 
 ```bash
 # Clone repository
-git clone https://github.com/YOUR_USERNAME/fesco-tracker.git
+git clone https://github.com/shahzaib-javed-python-backend/fesco-tracker.git
 cd fesco-tracker
 
 # Create virtual environment
