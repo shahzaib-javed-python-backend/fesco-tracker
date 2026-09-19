@@ -59,3 +59,10 @@ pip install -r requirements.txt
 # Run server
 uvicorn app.main:app --reload
 Visit: http://127.0.0.1:8000
+## 📸 Screenshots
+
+![Homepage](screenshots/home.png)
+![Prediction](screenshots/prediction.png)
+![Analytics](screenshots/analytics.png)
+![ML Prediction](screenshots/ml.png)
+![History](screenshots/history.png)
