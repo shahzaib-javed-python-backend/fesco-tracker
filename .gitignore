@@ -1,0 +1,39 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+fesco_tracker.db
+
+# Models
+models_cache/
+
+# Environment
+.env
+
+# Test files
+fesco_response.html
+test_fesco.py
+
+# Ngrok
+ngrok.exe
+ngrok.exe.exe
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
