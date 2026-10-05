@@ -41,6 +41,21 @@ def test_empty_history_stats_are_safe():
     }
 
 
+def test_public_health_and_seo_endpoints():
+    client = TestClient(app)
+
+    health = client.get("/health")
+    robots = client.get("/robots.txt")
+    sitemap = client.get("/sitemap.xml")
+
+    assert health.status_code == 200
+    assert health.json()["status"] == "ok"
+    assert robots.status_code == 200
+    assert "Sitemap:" in robots.text
+    assert sitemap.status_code == 200
+    assert "urlset" in sitemap.text
+
+
 def test_demo_bill_supports_analytics_and_ml():
     client = TestClient(app)
     reference_no = "12345678901236"

@@ -217,6 +217,45 @@ def root():
     return FileResponse(STATIC_DIR / "index.html")
 
 
+@app.get("/health")
+def health_check():
+    return {
+        "status": "ok",
+        "service": settings.app_name,
+        "version": settings.app_version,
+        "demo_mode": settings.demo_mode,
+    }
+
+
+@app.get("/robots.txt", response_class=Response)
+def robots():
+    return Response(
+        content=(
+            "User-agent: *\n"
+            "Allow: /\n"
+            "Disallow: /db/\n"
+            f"Sitemap: {settings.public_base_url.rstrip('/')}/sitemap.xml\n"
+        ),
+        media_type="text/plain",
+    )
+
+
+@app.get("/sitemap.xml", response_class=Response)
+def sitemap():
+    base_url = settings.public_base_url.rstrip("/")
+    return Response(
+        content=(
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+            f"<url><loc>{base_url}/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>"
+            f"<url><loc>{base_url}/#bill-search</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>"
+            f"<url><loc>{base_url}/#services</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>"
+            "</urlset>"
+        ),
+        media_type="application/xml",
+    )
+
+
 # ============================================================
 # DB ENDPOINTS
 # ============================================================
