@@ -1079,21 +1079,35 @@
             return date.toLocaleDateString();
         }
 
-        function getSavedMeters() { return JSON.parse(localStorage.getItem('savedMeters') || '[]'); }
+        function getSavedMeters() {
+            try {
+                const stored = JSON.parse(localStorage.getItem('savedMeters') || '[]');
+                return stored.map(m => typeof m === 'string'
+                    ? { reference_no: m, disco: 'fesco' }
+                    : { reference_no: m.reference_no, disco: m.disco || 'fesco' }
+                ).filter(m => /^\d{14}$/.test(m.reference_no));
+            } catch (err) {
+                return [];
+            }
+        }
 
         function saveMeter() {
             const refNo = document.getElementById('refInput').value.trim();
-            if (!refNo || refNo.length < 10) { alert(t('saved_error')); return; }
+            const disco = document.getElementById('discoSelect').value;
+            if (!/^\d{14}$/.test(refNo)) { alert(t('saved_error')); return; }
             const meters = getSavedMeters();
-            if (meters.includes(refNo)) { alert(t('already_saved')); return; }
-            meters.push(refNo);
+            if (meters.some(m => m.reference_no === refNo && m.disco === disco)) {
+                alert(t('already_saved'));
+                return;
+            }
+            meters.push({ reference_no: refNo, disco });
             localStorage.setItem('savedMeters', JSON.stringify(meters));
             renderSavedMeters();
             alert(t('saved_success'));
         }
 
-        function removeMeter(refNo) {
-            const meters = getSavedMeters().filter(m => m !== refNo);
+        function removeMeter(refNo, disco) {
+            const meters = getSavedMeters().filter(m => !(m.reference_no === refNo && m.disco === disco));
             localStorage.setItem('savedMeters', JSON.stringify(meters));
             renderSavedMeters();
         }
@@ -1106,14 +1120,15 @@
             card.style.display = 'block';
             list.innerHTML = meters.map(m => `
                 <div style="background: var(--stat-bg); padding: 10px 15px; border-radius: 10px; display: flex; align-items: center; gap: 10px; border: 1px solid var(--border-color);">
-                    <span onclick="loadMeter('${m}')" style="cursor: pointer; font-weight: 600; color: #667eea;">📍 ${m}</span>
-                    <span onclick="removeMeter('${m}')" style="cursor: pointer; color: #eb3349; font-weight: 700;">×</span>
+                    <span onclick="loadMeter('${m.reference_no}', '${m.disco}')" style="cursor: pointer; font-weight: 600; color: #667eea;">📍 ${m.reference_no} <small style="color: var(--text-secondary);">${m.disco.toUpperCase()}</small></span>
+                    <span onclick="removeMeter('${m.reference_no}', '${m.disco}')" style="cursor: pointer; color: #eb3349; font-weight: 700;">×</span>
                 </div>
             `).join('');
         }
 
-        function loadMeter(refNo) {
+        function loadMeter(refNo, disco) {
             document.getElementById('refInput').value = refNo;
+            document.getElementById('discoSelect').value = disco;
             searchBill();
         }
 
