@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     app_name: str = "FESCO Bill Tracker"
     app_version: str = "1.0.0"
     debug: bool = False
+    demo_mode: bool = False
     
     # Database
     database_url: str = "sqlite:///./fesco_tracker.db"

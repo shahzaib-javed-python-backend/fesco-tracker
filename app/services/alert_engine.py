@@ -28,13 +28,25 @@ def check_unit_alert(units: int) -> dict:
 
 def get_units_stats(history: list) -> dict:
     """History se units ke statistics nikalta hai."""
+    # 🛑 CRASH FIX: Agar history khali ho to yahin se safe default data return karo
+    if not history:
+        return {
+            "average_units": 0.0,
+            "max_units": 0,
+            "min_units": 0,
+            "total_months": 0,
+            "total_units": 0,
+        }
+
     units_list = [item["units"] for item in history]
 
     total = sum(units_list)
     count = len(units_list)
-    average = total / count
-    maximum = max(units_list)
-    minimum = min(units_list)
+    
+    # Extra check safety ke liye
+    average = total / count if count > 0 else 0.0
+    maximum = max(units_list) if units_list else 0
+    minimum = min(units_list) if units_list else 0
 
     return {
         "average_units": round(average, 2),
@@ -235,17 +247,4 @@ def calculate_slab_savings(current_units: int) -> dict:
                 "type": "hint",
                 "current_slab": current_slab["name"],
                 "threshold": prev_slab["max"],
-                "units_over": units_over,
-                "message": f"💡 Aap ne abhi {prev_slab['max']} units cross kiye hain. {units_over} units zyada use karne pe aap {current_slab['name']} mein hain — Rs {int(extra_cost)} extra lag rahe hain. Agar {units_over} units kam karein to wapas {prev_slab['name']} mein aa jayenge.",
-                "savings_rs": int(extra_cost),
-                "color": "blue",
             }
-
-    # Safe zone — user slab ke andar araam se hai
-    return {
-        "type": "safe",
-        "current_slab": current_slab["name"],
-        "message": f"✅ Aap {current_slab['name']} mein hain aur agle slab ({next_slab['name']}) se safe door hain. {units_to_go} units door hain.",
-        "units_to_go": units_to_go,
-        "color": "green",
-    }

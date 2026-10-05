@@ -1,4 +1,6 @@
 from app.services.fesco_client import fetch_bill_html, parse_bill_html
+from app.config import settings
+from copy import deepcopy
 
 
 # ============================================================
@@ -75,6 +77,18 @@ def get_bill_by_reference(ref_no: str, disco: str = "fesco") -> dict | None:
     1. Live fetch try karo with disco parameter
     2. Fail ho to mock data se fallback
     """
+    if settings.demo_mode:
+        demo_bill = deepcopy(MOCK_BILLS[next(iter(MOCK_BILLS))])
+        demo_bill.update({
+            "reference_no": ref_no,
+            "consumer_id": ref_no[-10:],
+            "name": "Demo Consumer",
+            "address": "Demo data for local presentation",
+            "disco": disco.upper(),
+            "is_demo": True,
+        })
+        return demo_bill
+
     print(f"[DATA] Fetching live bill from {disco.upper()} for {ref_no}...")
 
     # Try live fetch
@@ -89,6 +103,9 @@ def get_bill_by_reference(ref_no: str, disco: str = "fesco") -> dict | None:
             print(f"[DATA] ✅ Live data mila — Units: {data['current_units']}")
             return data
 
-    # Fallback to mock
-    print(f"[DATA] ⚠️ Live fetch fail — mock data use kar rahe hain")
-    return MOCK_BILLS.get(ref_no)
+    if settings.debug:
+        print(f"[DATA] ⚠️ Live fetch fail — debug mock data use kar rahe hain")
+        return MOCK_BILLS.get(ref_no)
+
+    print("[DATA] Live fetch fail — no bill returned")
+    return None

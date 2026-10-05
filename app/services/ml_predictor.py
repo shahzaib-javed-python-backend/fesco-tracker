@@ -4,13 +4,13 @@ from sklearn.linear_model import LinearRegression, Ridge
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import r2_score, mean_absolute_error
 import joblib
-import os
 from datetime import datetime
+from pathlib import Path
 
 
 # Model save path
-MODEL_DIR = "models_cache"
-os.makedirs(MODEL_DIR, exist_ok=True)
+MODEL_DIR = Path(__file__).resolve().parents[2] / "models_cache"
+MODEL_DIR.mkdir(exist_ok=True)
 
 
 def _prepare_features(history: list) -> pd.DataFrame:
@@ -168,7 +168,7 @@ def predict_with_ml(history: list, ref_no: str) -> dict:
         )
 
         # Model save karo
-        model_path = os.path.join(MODEL_DIR, f"{ref_no}_model.pkl")
+        model_path = MODEL_DIR / f"{ref_no}_model.pkl"
         joblib.dump(training["best_model_obj"], model_path)
 
         return {
@@ -177,7 +177,7 @@ def predict_with_ml(history: list, ref_no: str) -> dict:
             "best_r2_score": round(training["best_score"], 3),
             "training_rows": len(training["df_clean"]),
             "prediction": prediction,
-            "model_saved": model_path,
+            "model_saved": str(model_path),
             "generated_at": datetime.utcnow().isoformat(),
         }
 

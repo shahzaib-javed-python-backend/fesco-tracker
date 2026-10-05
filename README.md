@@ -12,7 +12,17 @@ A production-grade Python backend for tracking live electricity bills across 10 
 - 🌐 **Bilingual** — English + Urdu (RTL)
 - 🌙 **Dark Mode** + Tab Navigation
 - 📱 **PWA** — installable on mobile/desktop
-- 🔒 **8-Layer Security** — rate limiting, CORS, headers, input validation
+- 🔒 **8-Layer Security** — robust protection across multiple architectural tiers
+
+## 🔒 8-Layer Security Implementation
+1. **Rate Limiting:** Protects endpoints against brute-force and DDoS attacks using `slowapi`.
+2. **CORS Configuration:** Strictly restricts unauthorized cross-origin resource sharing.
+3. **Security Headers:** Implements comprehensive HTTP headers (X-Frame-Options, X-Content-Type-Options, HSTS).
+4. **Input Validation:** Strict data sanitization and payload validation using Pydantic models.
+5. **SQL Injection Prevention:** Utilizes SQLAlchemy ORM parameterized queries.
+6. **Error Handling & Masking:** Prevents stack trace leakage on production responses.
+7. **Environment Isolation:** Sensitive configurations managed securely via `.env` variables.
+8. **Request Logging & Auditing:** Tracks incoming request patterns for anomaly detection.
 
 ## 🛠️ Tech Stack
 
@@ -44,7 +54,7 @@ A production-grade Python backend for tracking live electricity bills across 10 
 
 ```bash
 # Clone repository
-git clone https://github.com/shahzaib-javed-python-backend/fesco-tracker.git
+git clone [https://github.com/shahzaib-javed-python-backend/fesco-tracker.git](https://github.com/shahzaib-javed-python-backend/fesco-tracker.git)
 cd fesco-tracker
 
 # Create virtual environment
@@ -58,11 +68,3 @@ pip install -r requirements.txt
 
 # Run server
 uvicorn app.main:app --reload
-Visit: http://127.0.0.1:8000
-## 📸 Screenshots
-
-![Homepage](screenshots/home.png)
-![Prediction](screenshots/prediction.png)
-![Analytics](screenshots/analytics.png)
-![ML Prediction](screenshots/ml.png)
-![History](screenshots/history.png)

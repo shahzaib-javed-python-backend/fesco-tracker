@@ -20,7 +20,7 @@ class BillRequest(BaseModel):
     @classmethod
     def validate_disco(cls, v: str) -> str:
         allowed = {"fesco", "lesco", "gepco", "mepco", "iesco",
-                   "pesco", "hesca", "qesco", "sepco", "tesco"}
+               "pesco", "hesco", "qesco", "sepco", "tesco"}
         v = v.lower()
         if v not in allowed:
             raise ValueError(f"DISCO must be one of: {', '.join(allowed)}")

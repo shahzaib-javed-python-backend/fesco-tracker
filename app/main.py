@@ -13,9 +13,11 @@ import json
 import os
 import re
 import socket
+from pathlib import Path
 from dotenv import load_dotenv
 
 from app.database import init_db, get_db, SessionLocal
+from app.config import settings
 from app.models.search import SearchHistory, CachedBill
 from app.data import get_bill_by_reference
 from app.models import BillResponse, AlertResponse
@@ -69,7 +71,6 @@ app = FastAPI(
     openapi_url="/openapi.json" if IS_LOCAL else None,
 )
 
-# Database initialize karo
 init_db()
 
 
@@ -92,7 +93,6 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(SecurityHeadersMiddleware)
 
-# CORS — sirf trusted origins
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -101,7 +101,6 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization"],
 )
 
-# Rate Limiter
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
@@ -109,19 +108,19 @@ app.add_middleware(SlowAPIMiddleware)
 
 
 # ============================================================
-# VALIDATION HELPERS
+# VALIDATION & HELPERS
 # ============================================================
 
 VALID_DISCOS = {"fesco", "lesco", "gepco", "mepco", "iesco",
-                "pesco", "hesca", "qesco", "sepco", "tesco"}
+                "pesco", "hesco", "qesco", "sepco", "tesco"}
 
 
 def validate_inputs(ref_no: str, disco: str = "fesco") -> tuple:
     """Validate reference number and disco."""
-    if not ref_no or not re.match(r"^\d{10,14}$", ref_no):
+    if not ref_no or not re.match(r"^\d{14}$", ref_no):
         raise HTTPException(
             status_code=400,
-            detail="Invalid reference number — 10-14 digits required"
+            detail="Invalid reference number — exactly 14 digits required"
         )
     disco = disco.lower()
     if disco not in VALID_DISCOS:
@@ -132,21 +131,90 @@ def validate_inputs(ref_no: str, disco: str = "fesco") -> tuple:
     return ref_no, disco
 
 
+# 🔥 ADDED: Database se fast history nikalne ka function
+def get_history_from_db(db: Session, ref_no: str, disco: str) -> list:
+    searches = db.query(SearchHistory)\
+        .filter(SearchHistory.reference_no == ref_no, SearchHistory.disco == disco)\
+        .order_by(SearchHistory.searched_at.asc())\
+        .all()
+    
+    if not searches:
+        return []
+
+    history_dict = {}
+    for s in searches:
+        if not s.searched_at: continue
+        month_key = s.searched_at.strftime("%b%y") 
+        history_dict[month_key] = {
+            "month": month_key,
+            "units": s.units or 0,
+            "bill": s.grand_total or 0,
+            "payment": s.grand_total or 0
+        }
+    
+    return list(history_dict.values())
+
+
+# 🔥 ADDED: FESCO se slow fetch ki bajaye Cache se fast fetch karo
+def get_bill_data(db: Session, ref_no: str, disco: str) -> dict:
+    """
+    Pehle cache check karo. Agar data 30 min se purana nahi hai, 
+    to FESCO ko request bhejne ke bajaye Cache se dedo (Ultra Fast!).
+    """
+    cached = db.query(CachedBill).filter(
+        CachedBill.reference_no == ref_no,
+        CachedBill.disco == disco,
+    ).first()
+
+    # Cache lifetime is configurable so deployments can choose freshness.
+    if cached:
+        age = datetime.utcnow() - cached.fetched_at.replace(tzinfo=None)
+        cached_bill = json.loads(cached.bill_data)
+        if age < timedelta(minutes=settings.cache_ttl_minutes):
+            print(f"[CACHE] ✅ Fast Hit for {ref_no}")
+            return cached_bill
+
+    # Agar cache nahi hai ya 30 min se purana hai, to FESCO se fetch karo (Slow)
+    print(f"[CACHE] ❌ Miss for {ref_no} — Fetching from FESCO...")
+    bill = get_bill_by_reference(ref_no, disco=disco)
+    if not bill:
+        raise HTTPException(status_code=404, detail="Reference number nahi mila")
+
+    # FESCO se aya hua data cache mein save karo taake next time fast ho
+    if cached:
+        cached.bill_data = json.dumps(bill, default=str)
+        cached.fetched_at = datetime.utcnow()
+    else:
+        new_cache = CachedBill(
+            reference_no=ref_no,
+            disco=disco,
+            bill_data=json.dumps(bill, default=str),
+        )
+        db.add(new_cache)
+    
+    db.commit()
+    return bill
+
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+STATIC_DIR = BASE_DIR / "static"
+
+
 # ============================================================
 # STATIC & HTML
 # ============================================================
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
 @app.get("/manifest.json")
 def manifest():
-    return FileResponse("static/manifest.json")
+    return FileResponse(STATIC_DIR / "manifest.json")
 
 
 @app.get("/")
 def root():
-    return FileResponse("static/index.html")
+    return FileResponse(STATIC_DIR / "index.html")
 
 
 # ============================================================
@@ -156,7 +224,6 @@ def root():
 @app.get("/db/search-history")
 @limiter.limit("30/minute")
 def get_search_history(request: Request, db: Session = Depends(get_db), limit: int = 20):
-    """Recent search history."""
     limit = min(max(1, limit), 100)
     searches = db.query(SearchHistory)\
         .order_by(SearchHistory.searched_at.desc())\
@@ -180,7 +247,6 @@ def get_search_history(request: Request, db: Session = Depends(get_db), limit: i
 @app.get("/db/popular-searches")
 @limiter.limit("30/minute")
 def get_popular_searches(request: Request, db: Session = Depends(get_db), limit: int = 5):
-    """Most searched reference numbers."""
     from sqlalchemy import func
 
     limit = min(max(1, limit), 20)
@@ -198,7 +264,6 @@ def get_popular_searches(request: Request, db: Session = Depends(get_db), limit:
 @app.get("/db/cache-stats")
 @limiter.limit("30/minute")
 def get_cache_stats(request: Request, db: Session = Depends(get_db)):
-    """Cache statistics."""
     total_cached = db.query(CachedBill).count()
     total_searches = db.query(SearchHistory).count()
 
@@ -220,37 +285,14 @@ def get_bill(
     disco: str = "fesco",
     db: Session = Depends(get_db),
 ):
-    """Bill fetch karo — cache check ke saath."""
+    """Bill fetch karo — Cache check ke saath."""
     ref_no, disco = validate_inputs(ref_no, disco)
+    
+    # 🔥 Use new helper function
+    bill = get_bill_data(db, ref_no, disco)
 
-    cached = db.query(CachedBill).filter(
-        CachedBill.reference_no == ref_no,
-        CachedBill.disco == disco,
-    ).first()
-
-    if cached:
-        age = datetime.utcnow() - cached.fetched_at.replace(tzinfo=None)
-        if age < timedelta(minutes=10):
-            print(f"[CACHE] ✅ Hit for {ref_no} (age: {age.seconds}s)")
-            return json.loads(cached.bill_data)
-        else:
-            print(f"[CACHE] ⏰ Expired for {ref_no} — refetching...")
-
-    bill = get_bill_by_reference(ref_no, disco=disco)
-    if not bill:
-        raise HTTPException(status_code=404, detail="Reference number nahi mila")
-
-    if cached:
-        cached.bill_data = json.dumps(bill, default=str)
-        cached.fetched_at = datetime.utcnow()
-    else:
-        new_cache = CachedBill(
-            reference_no=ref_no,
-            disco=disco,
-            bill_data=json.dumps(bill, default=str),
-        )
-        db.add(new_cache)
-
+    # Search history mein save karo (sirf jab user explicitly search kare)
+    # Cache se data aya ho, tab bhi history save honi chahiye
     history = SearchHistory(
         reference_no=ref_no,
         disco=disco,
@@ -261,19 +303,17 @@ def get_bill(
     db.add(history)
     db.commit()
 
-    print(f"[CACHE] ❌ Miss for {ref_no} — fresh fetch, saved to DB")
     return bill
 
 
 @app.get("/alert/{ref_no}", response_model=AlertResponse)
 @limiter.limit("15/minute")
-def get_alert(request: Request, ref_no: str, disco: str = "fesco"):
+def get_alert(request: Request, ref_no: str, disco: str = "fesco", db: Session = Depends(get_db)):
     """Smart alert (prediction ke saath)."""
     ref_no, disco = validate_inputs(ref_no, disco)
-
-    bill = get_bill_by_reference(ref_no, disco=disco)
-    if not bill:
-        raise HTTPException(status_code=404, detail="Reference number nahi mila")
+    
+    # 🔥 Slow scraper ki bajaye fast cache use karo
+    bill = get_bill_data(db, ref_no, disco)
 
     reading_date = date.fromisoformat(bill["reading_date"])
     prediction = predict_monthly_units(bill["current_units"], reading_date)
@@ -290,38 +330,29 @@ def get_alert(request: Request, ref_no: str, disco: str = "fesco"):
 
 @app.get("/history/{ref_no}")
 @limiter.limit("20/minute")
-def get_history(request: Request, ref_no: str, disco: str = "fesco"):
-    """Bill history."""
+def get_history(request: Request, ref_no: str, disco: str = "fesco", db: Session = Depends(get_db)):
     ref_no, disco = validate_inputs(ref_no, disco)
-
-    bill = get_bill_by_reference(ref_no, disco=disco)
-    if not bill:
-        raise HTTPException(status_code=404, detail="Reference number nahi mila")
-    return bill["history"]
+    history = get_history_from_db(db, ref_no, disco)
+    return history
 
 
 @app.get("/stats/{ref_no}")
 @limiter.limit("20/minute")
-def get_stats(request: Request, ref_no: str, disco: str = "fesco"):
-    """Units statistics."""
+def get_stats(request: Request, ref_no: str, disco: str = "fesco", db: Session = Depends(get_db)):
     ref_no, disco = validate_inputs(ref_no, disco)
-
-    bill = get_bill_by_reference(ref_no, disco=disco)
-    if not bill:
-        raise HTTPException(status_code=404, detail="Reference number nahi mila")
-
-    return get_units_stats(bill["history"])
+    history = get_history_from_db(db, ref_no, disco)
+    if not history:
+        return {"avg": 0, "max": 0, "min": 0, "months": 0}
+    return get_units_stats(history)
 
 
 @app.get("/predict/{ref_no}")
 @limiter.limit("15/minute")
-def get_prediction(request: Request, ref_no: str, disco: str = "fesco"):
-    """Month-end prediction."""
+def get_prediction(request: Request, ref_no: str, disco: str = "fesco", db: Session = Depends(get_db)):
     ref_no, disco = validate_inputs(ref_no, disco)
-
-    bill = get_bill_by_reference(ref_no, disco=disco)
-    if not bill:
-        raise HTTPException(status_code=404, detail="Reference number nahi mila")
+    
+    # 🔥 Fast cache use karo
+    bill = get_bill_data(db, ref_no, disco)
 
     reading_date = date.fromisoformat(bill["reading_date"])
     prediction = predict_monthly_units(bill["current_units"], reading_date)
@@ -335,16 +366,15 @@ def get_prediction(request: Request, ref_no: str, disco: str = "fesco"):
 
 @app.get("/compare/{ref_no}")
 @limiter.limit("15/minute")
-def get_comparison(request: Request, ref_no: str, disco: str = "fesco"):
-    """Year-over-year comparison."""
+def get_comparison(request: Request, ref_no: str, disco: str = "fesco", db: Session = Depends(get_db)):
     ref_no, disco = validate_inputs(ref_no, disco)
-
-    bill = get_bill_by_reference(ref_no, disco=disco)
-    if not bill:
-        raise HTTPException(status_code=404, detail="Reference number nahi mila")
+    
+    # 🔥 Fast cache use karo
+    bill = get_bill_data(db, ref_no, disco)
+    history = get_history_from_db(db, ref_no, disco)
 
     comparison = compare_with_last_year(
-        bill["history"],
+        history,
         bill["current_units"],
         bill["bill_month"],
     )
@@ -356,13 +386,11 @@ def get_comparison(request: Request, ref_no: str, disco: str = "fesco"):
 
 @app.get("/savings/{ref_no}")
 @limiter.limit("15/minute")
-def get_savings(request: Request, ref_no: str, disco: str = "fesco"):
-    """Slab savings hint."""
+def get_savings(request: Request, ref_no: str, disco: str = "fesco", db: Session = Depends(get_db)):
     ref_no, disco = validate_inputs(ref_no, disco)
-
-    bill = get_bill_by_reference(ref_no, disco=disco)
-    if not bill:
-        raise HTTPException(status_code=404, detail="Reference number nahi mila")
+    
+    # 🔥 Fast cache use karo
+    bill = get_bill_data(db, ref_no, disco)
 
     savings = calculate_slab_savings(bill["current_units"])
     if not savings:
@@ -377,21 +405,21 @@ def get_savings(request: Request, ref_no: str, disco: str = "fesco"):
 
 @app.get("/download-pdf/{ref_no}")
 @limiter.limit("5/minute")
-def download_pdf(request: Request, ref_no: str, disco: str = "fesco"):
-    """PDF generation."""
+def download_pdf(request: Request, ref_no: str, disco: str = "fesco", db: Session = Depends(get_db)):
     ref_no, disco = validate_inputs(ref_no, disco)
-
-    bill = get_bill_by_reference(ref_no, disco=disco)
-    if not bill:
-        raise HTTPException(status_code=404, detail="Reference number nahi mila")
+    
+    # 🔥 Fast cache use karo
+    bill = get_bill_data(db, ref_no, disco)
+    history = get_history_from_db(db, ref_no, disco)
 
     reading_date = date.fromisoformat(bill["reading_date"])
     prediction = predict_monthly_units(bill["current_units"], reading_date)
     alert = smart_alert(bill["current_units"], prediction["predicted_units"])
-    stats = get_units_stats(bill["history"])
+    
+    stats = get_units_stats(history) if history else {}
     comparison = compare_with_last_year(
-        bill["history"], bill["current_units"], bill["bill_month"]
-    )
+        history, bill["current_units"], bill["bill_month"]
+    ) if history else None
     savings = calculate_slab_savings(bill["current_units"])
 
     pdf_bytes = generate_bill_pdf(bill, alert, prediction, stats, comparison, savings)
@@ -407,20 +435,16 @@ def download_pdf(request: Request, ref_no: str, disco: str = "fesco"):
 
 @app.get("/analytics/{ref_no}")
 @limiter.limit("20/minute")
-def get_analytics(request: Request, ref_no: str, disco: str = "fesco"):
-    """Advanced analytics (Pandas)."""
+def get_analytics(request: Request, ref_no: str, disco: str = "fesco", db: Session = Depends(get_db)):
     ref_no, disco = validate_inputs(ref_no, disco)
+    history = get_history_from_db(db, ref_no, disco)
 
-    bill = get_bill_by_reference(ref_no, disco=disco)
-    if not bill:
-        raise HTTPException(status_code=404, detail="Reference number nahi mila")
-
-    analysis = analyze_bill_history(bill["history"])
+    analysis = analyze_bill_history(history)
     if "error" in analysis:
         raise HTTPException(status_code=400, detail=analysis["error"])
 
     return {
-        "reference_no": bill["reference_no"],
+        "reference_no": ref_no,
         "disco": disco,
         **analysis,
     }
@@ -428,20 +452,17 @@ def get_analytics(request: Request, ref_no: str, disco: str = "fesco"):
 
 @app.get("/ml-predict/{ref_no}")
 @limiter.limit("5/minute")
-def get_ml_prediction(request: Request, ref_no: str, disco: str = "fesco"):
-    """ML prediction (scikit-learn)."""
+def get_ml_prediction(request: Request, ref_no: str, disco: str = "fesco", db: Session = Depends(get_db)):
     ref_no, disco = validate_inputs(ref_no, disco)
+    history = get_history_from_db(db, ref_no, disco)
 
-    bill = get_bill_by_reference(ref_no, disco=disco)
-    if not bill:
-        raise HTTPException(status_code=404, detail="Reference number nahi mila")
-
-    result = predict_with_ml(bill["history"], ref_no)
+    result = predict_with_ml(history, ref_no)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
 
     return {
-        "reference_no": bill["reference_no"],
+        "reference_no": ref_no,
         "disco": disco,
         **result,
     }
+    

@@ -457,7 +457,7 @@
                     <option value="mepco">MEPCO — Multan</option>
                     <option value="iesco">IESCO — Islamabad</option>
                     <option value="pesco">PESCO — Peshawar</option>
-                    <option value="hesca">HESCO — Hyderabad</option>
+                    <option value="hesco">HESCO — Hyderabad</option>
                     <option value="qesco">QESCO — Quetta</option>
                     <option value="sepco">SEPCO — Sukkur</option>
                     <option value="tesco">TESCO — Tribal Areas</option>
@@ -870,8 +870,8 @@
             const loader = document.getElementById('loader');
             const results = document.getElementById('results');
 
-            if (!refNo || refNo.length < 10) {
-                alert('Enter valid 14-digit reference number');
+            if (!/^\d{14}$/.test(refNo)) {
+                alert('Enter a valid 14-digit reference number');
                 return;
             }
 
@@ -882,18 +882,23 @@
             document.getElementById('tabsNav').style.display = 'none';
 
             try {
-                const alertRes = await fetch(`/alert/${refNo}?disco=${disco}`);
-                if (!alertRes.ok) throw new Error(t('error_title'));
-                const alertData = await alertRes.json();
+                const fetchJSON = async (url) => {
+                    const response = await fetch(url);
+                    if (!response.ok) {
+                        let detail = `Request failed (${response.status})`;
+                        try { detail = (await response.json()).detail || detail; } catch (_) { }
+                        throw new Error(detail);
+                    }
+                    return response.json();
+                };
 
-                const predRes = await fetch(`/predict/${refNo}?disco=${disco}`);
-                const predData = await predRes.json();
+                const alertData = await fetchJSON(`/alert/${refNo}?disco=${disco}`);
 
-                const billRes = await fetch(`/bill/${refNo}?disco=${disco}`);
-                const billData = await billRes.json();
+                const predData = await fetchJSON(`/predict/${refNo}?disco=${disco}`);
 
-                const statsRes = await fetch(`/stats/${refNo}?disco=${disco}`);
-                const statsData = await statsRes.json();
+                const billData = await fetchJSON(`/bill/${refNo}?disco=${disco}`);
+
+                const statsData = await fetchJSON(`/stats/${refNo}?disco=${disco}`);
 
                 const compareRes = await fetch(`/compare/${refNo}?disco=${disco}`);
                 const compareData = compareRes.ok ? await compareRes.json() : null;
@@ -912,6 +917,7 @@
                 results.innerHTML = `<div class="error-box">
                     <h3>❌ ${t('error_title')}</h3>
                     <p><strong>${discoName}</strong> ${t('error_msg')} <code>${refNo}</code></p>
+                    <p style="font-size: 0.9em; margin-top: 10px;">${err.message}</p>
                     <p style="font-size: 0.9em; margin-top: 15px;">
                         <strong>${t('error_hint')}</strong>
                     </p>
@@ -928,11 +934,17 @@
             const statusClass = alert.status || 'safe';
             const currentDisco = document.getElementById('discoSelect').value;
             const predClass = pred.predicted_units > 200 ? 'bad' : pred.predicted_units > 190 ? 'warn' : 'good';
+            const demoBanner = bill.is_demo ? `
+                <div class="card" style="border: 2px solid #f2994a; color: #f2c94c; text-align: center;">
+                    <strong>DEMO DATA</strong> — This is sample data for local presentation, not an official bill.
+                </div>
+            ` : '';
 
             window._historyData = bill.history;
 
             // OVERVIEW TAB
             const overviewHTML = `
+                ${demoBanner}
                 <div class="alert-box ${statusClass}">
                     <h2>${getStatusIcon(alert.status)} ${getStatusTitle(alert.status)}</h2>
                     <p>${alert.message}</p>

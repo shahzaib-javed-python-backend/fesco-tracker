@@ -1,6 +1,7 @@
 import re
 import requests
 from bs4 import BeautifulSoup
+from app.config import settings
 
 
 DISCO_URLS = {
@@ -55,7 +56,8 @@ def _extract_hidden_fields(soup: BeautifulSoup) -> dict:
 
 def fetch_bill_html(ref_no: str, disco: str = "fesco") -> str | None:
     """FESCO / LESCO / etc. PITC se bill ka HTML laata hai."""
-    home_url = DISCO_URLS.get(disco.lower(), DISCO_URLS["fesco"])
+    normalized_disco = disco.lower()
+    home_url = DISCO_URLS.get(normalized_disco, DISCO_URLS["fesco"])
     submit_url = home_url
     
     session = requests.Session()
@@ -63,7 +65,7 @@ def fetch_bill_html(ref_no: str, disco: str = "fesco") -> str | None:
 
     try:
         # Step 1: Homepage GET
-        home_response = session.get(home_url, timeout=15)
+        home_response = session.get(home_url, timeout=settings.fesco_timeout)
         home_response.raise_for_status()
 
         soup = BeautifulSoup(home_response.text, "lxml")
@@ -86,7 +88,7 @@ def fetch_bill_html(ref_no: str, disco: str = "fesco") -> str | None:
                 "Origin": "https://bill.pitc.com.pk",
                 "Content-Type": "application/x-www-form-urlencoded",
             },
-            timeout=15,
+            timeout=settings.fesco_timeout,
             allow_redirects=True,
         )
         bill_response.raise_for_status()

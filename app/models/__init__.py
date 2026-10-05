@@ -29,6 +29,7 @@ class BillResponse(BaseModel):
     current_bill: int
     grand_total: int
     history: List[BillHistory]
+    is_demo: bool = False
 
 
 class AlertResponse(BaseModel):

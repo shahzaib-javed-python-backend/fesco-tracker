@@ -48,3 +48,5 @@ def init_db():
     # Models import karo taake Base.metadata ko pata chale
     from app.models import user, meter, search  # noqa
     Base.metadata.create_all(bind=engine)
+    
+    
