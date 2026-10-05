@@ -11,6 +11,18 @@
     <meta property="og:title" content="FESCO Bill Tracker | Check Electricity Bill Online">
     <meta property="og:description" content="A trusted workspace for checking FESCO bills, monitoring units and understanding monthly electricity usage.">
     <meta property="og:type" content="website">
+    <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            "mainEntity": [
+                {"@type": "Question", "name": "How can I check my FESCO electricity bill online?", "acceptedAnswer": {"@type": "Answer", "text": "Select FESCO, enter your 14-digit reference number, and choose Search to view bill details, units, due date and payment amount."}},
+                {"@type": "Question", "name": "Where can I find my FESCO reference number?", "acceptedAnswer": {"@type": "Answer", "text": "Your reference number is printed on a previous electricity bill. It is normally a 14-digit number used to retrieve your bill."}},
+                {"@type": "Question", "name": "Can I check electricity usage history?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. After a bill is loaded, the tracker can show consumption history, trends, alerts, predictions and analytics when data is available."}},
+                {"@type": "Question", "name": "Is this the official FESCO website?", "acceptedAnswer": {"@type": "Answer", "text": "No. This is an independent bill-tracking service. Verify final bill information through official FESCO or PITC channels."}}
+            ]
+        }
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
@@ -603,6 +615,12 @@
         .tab-btn.active { background: var(--brand-blue); box-shadow: none; }
         .results p, .results h2, .results h3, .results strong, .results td { color: var(--ink); }
         .alert-box p, .alert-box h2 { color: white !important; }
+        .faq-section { max-width: 850px; padding: 12px 0 56px; }
+        .faq-section h2 { color: var(--brand-blue-deep); font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.5rem; margin: 8px 0 18px; }
+        body.dark .faq-section h2 { color: var(--ink); }
+        .faq-section details { background: var(--surface); border: 1px solid var(--line); border-radius: 7px; margin-bottom: 9px; padding: 0 18px; box-shadow: var(--shadow-card); }
+        .faq-section summary { cursor: pointer; color: var(--ink); font-weight: 700; padding: 16px 0; list-style-position: inside; }
+        .faq-section details p { color: var(--muted); font-size: 0.9rem; line-height: 1.65; padding: 0 0 16px 24px; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -619,6 +637,7 @@
                     <a href="#bill-search">Check Bill</a>
                     <a href="#services">Services</a>
                     <a href="#about">About FESCO</a>
+                    <a href="#faq">FAQs</a>
                 </nav>
                 <div class="header-actions">
                     <button id="langToggle" class="header-action" onclick="toggleLanguage()" aria-label="Change language">EN</button>
@@ -730,6 +749,26 @@
                 <h2>Understand your electricity usage</h2>
                 <p>Along with bill details, you can explore consumption history, smart alerts, seasonal patterns and predictions. The experience is designed for households and small businesses that want a clearer view of monthly power usage.</p>
             </div>
+        </section>
+        <section class="faq-section" id="faq" aria-labelledby="faq-title">
+            <div class="eyebrow">Helpful answers</div>
+            <h2 id="faq-title">FESCO bill check FAQs</h2>
+            <details open>
+                <summary>How can I check my FESCO electricity bill online?</summary>
+                <p>Select FESCO, enter your 14-digit reference number, and choose Search to view bill details, units, due date and payment amount.</p>
+            </details>
+            <details>
+                <summary>Where can I find my FESCO reference number?</summary>
+                <p>Your reference number is printed on a previous electricity bill. It is normally a 14-digit number used to retrieve your bill.</p>
+            </details>
+            <details>
+                <summary>Can I check electricity usage history?</summary>
+                <p>Yes. After a bill is loaded, the tracker can show consumption history, trends, alerts, predictions and analytics when data is available.</p>
+            </details>
+            <details>
+                <summary>Is this the official FESCO website?</summary>
+                <p>No. This is an independent bill-tracking service. Verify final bill information through official FESCO or PITC channels.</p>
+            </details>
         </section>
         </main>
 
