@@ -437,7 +437,8 @@ def download_pdf(request: Request, ref_no: str, disco: str = "fesco", db: Sessio
 @limiter.limit("20/minute")
 def get_analytics(request: Request, ref_no: str, disco: str = "fesco", db: Session = Depends(get_db)):
     ref_no, disco = validate_inputs(ref_no, disco)
-    history = get_history_from_db(db, ref_no, disco)
+    bill = get_bill_data(db, ref_no, disco)
+    history = bill.get("history") or get_history_from_db(db, ref_no, disco)
 
     analysis = analyze_bill_history(history)
     if "error" in analysis:
@@ -454,7 +455,8 @@ def get_analytics(request: Request, ref_no: str, disco: str = "fesco", db: Sessi
 @limiter.limit("5/minute")
 def get_ml_prediction(request: Request, ref_no: str, disco: str = "fesco", db: Session = Depends(get_db)):
     ref_no, disco = validate_inputs(ref_no, disco)
-    history = get_history_from_db(db, ref_no, disco)
+    bill = get_bill_data(db, ref_no, disco)
+    history = bill.get("history") or get_history_from_db(db, ref_no, disco)
 
     result = predict_with_ml(history, ref_no)
     if "error" in result:

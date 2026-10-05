@@ -1,7 +1,8 @@
 import pytest
 from fastapi import HTTPException
+from fastapi.testclient import TestClient
 
-from app.main import STATIC_DIR, root, validate_inputs
+from app.main import STATIC_DIR, app, root, validate_inputs
 from app.schemas import BillRequest
 from app.services.alert_engine import get_units_stats
 
@@ -38,3 +39,16 @@ def test_empty_history_stats_are_safe():
         "total_months": 0,
         "total_units": 0,
     }
+
+
+def test_demo_bill_supports_analytics_and_ml():
+    client = TestClient(app)
+    reference_no = "12345678901236"
+
+    analytics = client.get(f"/analytics/{reference_no}?disco=fesco")
+    ml_prediction = client.get(f"/ml-predict/{reference_no}?disco=fesco")
+
+    assert analytics.status_code == 200
+    assert analytics.json()["summary"]["total_months"] >= 3
+    assert ml_prediction.status_code == 200
+    assert ml_prediction.json()["training_rows"] >= 6
