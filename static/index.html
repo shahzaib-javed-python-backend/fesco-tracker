@@ -793,6 +793,8 @@
                 ref_label: "Reference Number (14 digits)",
                 search: "Search",
                 save: "💾 Save",
+                remind_me: "🔔 Remind me",
+                reminder_saved: "Reminder saved for this bill",
                 loading: "Fetching data from FESCO... (3-5 seconds)",
                 saved_meters: "👥 Saved Meters",
                 recent_searches: "🕐 Recent Searches",
@@ -858,6 +860,8 @@
                 ref_label: "حوالہ نمبر (14 ہندسے)",
                 search: "تلاش کریں",
                 save: "💾 محفوظ کریں",
+                remind_me: "🔔 یاد دہانی لگائیں",
+                reminder_saved: "اس بل کی یاد دہانی محفوظ ہو گئی",
                 loading: "FESCO سے ڈیٹا لوڈ ہو رہا ہے... (3-5 سیکنڈ)",
                 saved_meters: "👥 محفوظ میٹرز",
                 recent_searches: "🕐 حالیہ تلاشیں",
@@ -1002,6 +1006,53 @@
             document.getElementById('themeToggle').textContent = isDark ? '☀️' : '🌙';
         }
 
+        function reminderKey(refNo, disco) {
+            return `${disco}:${refNo}`;
+        }
+
+        function parseDueDate(dateText) {
+            if (!dateText) return null;
+            const months = { JAN: 0, FEB: 1, MAR: 2, APR: 3, MAY: 4, JUN: 5, JUL: 6, AUG: 7, SEP: 8, OCT: 9, NOV: 10, DEC: 11 };
+            const parts = dateText.trim().toUpperCase().split(/\s+/);
+            if (parts.length !== 3 || months[parts[1]] === undefined) return null;
+            const year = Number(parts[2].length === 2 ? `20${parts[2]}` : parts[2]);
+            return new Date(year, months[parts[1]], Number(parts[0]));
+        }
+
+        async function enableBillReminder(refNo, disco, dueDate) {
+            const due = parseDueDate(dueDate);
+            if (!due || Number.isNaN(due.getTime())) {
+                alert('This bill does not have a valid due date.');
+                return;
+            }
+
+            if ('Notification' in window && Notification.permission === 'default') {
+                await Notification.requestPermission();
+            }
+
+            const reminders = JSON.parse(localStorage.getItem('billReminders') || '{}');
+            reminders[reminderKey(refNo, disco)] = { refNo, disco, dueDate };
+            localStorage.setItem('billReminders', JSON.stringify(reminders));
+
+            if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('FESCO Bill Reminder', { body: `${disco.toUpperCase()} bill ${refNo} is due on ${dueDate}.` });
+            }
+            alert(t('reminder_saved'));
+        }
+
+        function checkBillReminders() {
+            const reminders = JSON.parse(localStorage.getItem('billReminders') || '{}');
+            const soon = Object.values(reminders).find(reminder => {
+                const due = parseDueDate(reminder.dueDate);
+                if (!due) return false;
+                const days = Math.ceil((due - new Date()) / 86400000);
+                return days >= 0 && days <= 3;
+            });
+            if (soon && 'Notification' in window && Notification.permission === 'granted') {
+                new Notification('FESCO Bill Due Soon', { body: `${soon.disco.toUpperCase()} bill ${soon.refNo} is due on ${soon.dueDate}.` });
+            }
+        }
+
         async function fetchAnalytics(refNo) {
             const disco = document.getElementById('discoSelect').value;
             try {
@@ -1144,6 +1195,7 @@
             renderSavedMeters();
             loadRecentSearches();
             loadPopularSearches();
+            checkBillReminders();
         });
 
         async function searchBill() {
@@ -1233,7 +1285,10 @@
                     <p>${alert.message}</p>
                 </div>
 
-                <div style="text-align: right; margin-bottom: 15px;">
+                <div style="display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; margin-bottom: 15px;">
+                    <button type="button" onclick="enableBillReminder('${bill.reference_no}', '${currentDisco}', '${bill.due_date || ''}')" style="background: var(--brand-green);">
+                        ${t('remind_me')}
+                    </button>
                     <a href="/download-pdf/${bill.reference_no}?disco=${currentDisco}" 
                        style="display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 10px; font-weight: 600;">
                         ${t('download_pdf')}
