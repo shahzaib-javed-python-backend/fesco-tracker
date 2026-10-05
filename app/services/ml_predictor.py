@@ -4,7 +4,7 @@ from sklearn.linear_model import LinearRegression, Ridge
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import r2_score, mean_absolute_error
 import joblib
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -178,7 +178,7 @@ def predict_with_ml(history: list, ref_no: str) -> dict:
             "training_rows": len(training["df_clean"]),
             "prediction": prediction,
             "model_saved": str(model_path),
-            "generated_at": datetime.utcnow().isoformat(),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
         }
 
     except Exception as e:

@@ -49,6 +49,10 @@ A production-grade Python backend for tracking live electricity bills across 10 
 | GET | `/savings/{ref_no}` | Slab savings |
 | GET | `/download-pdf/{ref_no}` | PDF export |
 | GET | `/db/search-history` | Search history |
+| GET | `/export-history/{ref_no}` | Download history as CSV |
+| GET | `/privacy` | Privacy notice |
+| GET | `/terms` | Terms of use |
+| GET | `/contact` | Contact information |
 | GET | `/health` | Service health and runtime mode |
 | GET | `/robots.txt` | Search crawler rules |
 | GET | `/sitemap.xml` | Public SEO sitemap |

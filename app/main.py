@@ -2,7 +2,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, HTTPException, Depends, Request
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -13,6 +13,8 @@ import json
 import os
 import re
 import socket
+import csv
+import io
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -168,7 +170,7 @@ def get_bill_data(db: Session, ref_no: str, disco: str) -> dict:
 
     # Cache lifetime is configurable so deployments can choose freshness.
     if cached:
-        age = datetime.utcnow() - cached.fetched_at.replace(tzinfo=None)
+        age = datetime.now(timezone.utc).replace(tzinfo=None) - cached.fetched_at.replace(tzinfo=None)
         cached_bill = json.loads(cached.bill_data)
         if age < timedelta(minutes=settings.cache_ttl_minutes):
             print(f"[CACHE] ✅ Fast Hit for {ref_no}")
@@ -183,7 +185,7 @@ def get_bill_data(db: Session, ref_no: str, disco: str) -> dict:
     # FESCO se aya hua data cache mein save karo taake next time fast ho
     if cached:
         cached.bill_data = json.dumps(bill, default=str)
-        cached.fetched_at = datetime.utcnow()
+        cached.fetched_at = datetime.now(timezone.utc).replace(tzinfo=None)
     else:
         new_cache = CachedBill(
             reference_no=ref_no,
@@ -210,6 +212,21 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 @app.get("/manifest.json")
 def manifest():
     return FileResponse(STATIC_DIR / "manifest.json")
+
+
+@app.get("/privacy")
+def privacy_page():
+    return FileResponse(STATIC_DIR / "privacy.html")
+
+
+@app.get("/terms")
+def terms_page():
+    return FileResponse(STATIC_DIR / "terms.html")
+
+
+@app.get("/contact")
+def contact_page():
+    return FileResponse(STATIC_DIR / "contact.html")
 
 
 @app.get("/")
@@ -281,6 +298,25 @@ def get_search_history(request: Request, db: Session = Depends(get_db), limit: i
         }
         for s in searches
     ]
+
+
+@app.get("/export-history/{ref_no}")
+@limiter.limit("10/minute")
+def export_history(request: Request, ref_no: str, disco: str = "fesco", db: Session = Depends(get_db)):
+    ref_no, disco = validate_inputs(ref_no, disco)
+    history = get_history_from_db(db, ref_no, disco)
+    if not history:
+        raise HTTPException(status_code=404, detail="No history available for this reference")
+
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=["month", "units", "bill", "payment"])
+    writer.writeheader()
+    writer.writerows(history)
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{disco}-{ref_no}-history.csv"'},
+    )
 
 
 @app.get("/db/popular-searches")

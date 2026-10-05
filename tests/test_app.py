@@ -55,6 +55,23 @@ def test_public_health_and_seo_endpoints():
     assert sitemap.status_code == 200
     assert "urlset" in sitemap.text
 
+    for path in ("/privacy", "/terms", "/contact"):
+        page = client.get(path)
+        assert page.status_code == 200
+        assert "Back to FESCO Bill Tracker" in page.text
+
+
+def test_history_can_be_exported_as_csv():
+    client = TestClient(app)
+    reference_no = "12345678901237"
+    assert client.get(f"/bill/{reference_no}?disco=fesco").status_code == 200
+
+    export = client.get(f"/export-history/{reference_no}?disco=fesco")
+
+    assert export.status_code == 200
+    assert "text/csv" in export.headers["content-type"]
+    assert export.text.startswith("month,units,bill,payment")
+
 
 def test_demo_bill_supports_analytics_and_ml():
     client = TestClient(app)
