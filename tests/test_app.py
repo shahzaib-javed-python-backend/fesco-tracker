@@ -2,6 +2,7 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
+from app.config import settings
 from app.main import STATIC_DIR, app, root, validate_inputs
 from app.schemas import BillRequest
 from app.services.alert_engine import get_units_stats
@@ -61,7 +62,8 @@ def test_public_health_and_seo_endpoints():
         assert "Back to FESCO Bill Tracker" in page.text
 
 
-def test_history_can_be_exported_as_csv():
+def test_history_can_be_exported_as_csv(monkeypatch):
+    monkeypatch.setattr(settings, "demo_mode", True)
     client = TestClient(app)
     reference_no = "12345678901237"
     assert client.get(f"/bill/{reference_no}?disco=fesco").status_code == 200
@@ -73,7 +75,8 @@ def test_history_can_be_exported_as_csv():
     assert export.text.startswith("month,units,bill,payment")
 
 
-def test_demo_bill_supports_analytics_and_ml():
+def test_demo_bill_supports_analytics_and_ml(monkeypatch):
+    monkeypatch.setattr(settings, "demo_mode", True)
     client = TestClient(app)
     reference_no = "12345678901236"
 

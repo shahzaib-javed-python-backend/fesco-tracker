@@ -172,7 +172,9 @@ def get_bill_data(db: Session, ref_no: str, disco: str) -> dict:
     if cached:
         age = datetime.now(timezone.utc).replace(tzinfo=None) - cached.fetched_at.replace(tzinfo=None)
         cached_bill = json.loads(cached.bill_data)
-        if age < timedelta(minutes=settings.cache_ttl_minutes):
+        if age < timedelta(minutes=settings.cache_ttl_minutes) and (
+            settings.demo_mode or not cached_bill.get("is_demo", False)
+        ):
             print(f"[CACHE] ✅ Fast Hit for {ref_no}")
             return cached_bill
 
