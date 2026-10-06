@@ -69,9 +69,9 @@ app = FastAPI(
     title="FESCO Bill Tracker",
     description="FESCO bill check karo aur unit alerts pao",
     version="0.1.0",
-    docs_url="/docs" if IS_LOCAL else None,
-    redoc_url="/redoc" if IS_LOCAL else None,
-    openapi_url="/openapi.json" if IS_LOCAL else None,
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
 )
 
 init_db()
@@ -148,7 +148,6 @@ def validate_inputs(ref_no: str, disco: str = "fesco") -> tuple:
     return ref_no, disco
 
 
-# 🔥 ADDED: Database se fast history nikalne ka function
 def get_history_from_db(db: Session, ref_no: str, disco: str) -> list:
     searches = db.query(SearchHistory)\
         .filter(SearchHistory.reference_no == ref_no, SearchHistory.disco == disco)\
@@ -172,18 +171,12 @@ def get_history_from_db(db: Session, ref_no: str, disco: str) -> list:
     return list(history_dict.values())
 
 
-# 🔥 ADDED: FESCO se slow fetch ki bajaye Cache se fast fetch karo
 def get_bill_data(db: Session, ref_no: str, disco: str) -> dict:
-    """
-    Pehle cache check karo. Agar data 30 min se purana nahi hai, 
-    to FESCO ko request bhejne ke bajaye Cache se dedo (Ultra Fast!).
-    """
     cached = db.query(CachedBill).filter(
         CachedBill.reference_no == ref_no,
         CachedBill.disco == disco,
     ).first()
 
-    # Cache lifetime is configurable so deployments can choose freshness.
     if cached:
         age = datetime.now(timezone.utc).replace(tzinfo=None) - cached.fetched_at.replace(tzinfo=None)
         cached_bill = json.loads(cached.bill_data)
@@ -193,13 +186,11 @@ def get_bill_data(db: Session, ref_no: str, disco: str) -> dict:
             print(f"[CACHE] ✅ Fast Hit for {ref_no}")
             return cached_bill
 
-    # Agar cache nahi hai ya 30 min se purana hai, to FESCO se fetch karo (Slow)
     print(f"[CACHE] ❌ Miss for {ref_no} — Fetching from FESCO...")
     bill = get_bill_by_reference(ref_no, disco=disco)
     if not bill:
         raise HTTPException(status_code=404, detail="Reference number nahi mila")
 
-    # FESCO se aya hua data cache mein save karo taake next time fast ho
     if cached:
         cached.bill_data = json.dumps(bill, default=str)
         cached.fetched_at = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -380,14 +371,9 @@ def get_bill(
     disco: str = "fesco",
     db: Session = Depends(get_db),
 ):
-    """Bill fetch karo — Cache check ke saath."""
     ref_no, disco = validate_inputs(ref_no, disco)
-    
-    # 🔥 Use new helper function
     bill = get_bill_data(db, ref_no, disco)
 
-    # Search history mein save karo (sirf jab user explicitly search kare)
-    # Cache se data aya ho, tab bhi history save honi chahiye
     history = SearchHistory(
         reference_no=ref_no,
         disco=disco,
@@ -404,10 +390,7 @@ def get_bill(
 @app.get("/alert/{ref_no}", response_model=AlertResponse)
 @limiter.limit("15/minute")
 def get_alert(request: Request, ref_no: str, disco: str = "fesco", db: Session = Depends(get_db)):
-    """Smart alert (prediction ke saath)."""
     ref_no, disco = validate_inputs(ref_no, disco)
-    
-    # 🔥 Slow scraper ki bajaye fast cache use karo
     bill = get_bill_data(db, ref_no, disco)
 
     reading_date = date.fromisoformat(bill["reading_date"])
@@ -445,8 +428,6 @@ def get_stats(request: Request, ref_no: str, disco: str = "fesco", db: Session =
 @limiter.limit("15/minute")
 def get_prediction(request: Request, ref_no: str, disco: str = "fesco", db: Session = Depends(get_db)):
     ref_no, disco = validate_inputs(ref_no, disco)
-    
-    # 🔥 Fast cache use karo
     bill = get_bill_data(db, ref_no, disco)
 
     reading_date = date.fromisoformat(bill["reading_date"])
@@ -463,8 +444,6 @@ def get_prediction(request: Request, ref_no: str, disco: str = "fesco", db: Sess
 @limiter.limit("15/minute")
 def get_comparison(request: Request, ref_no: str, disco: str = "fesco", db: Session = Depends(get_db)):
     ref_no, disco = validate_inputs(ref_no, disco)
-    
-    # 🔥 Fast cache use karo
     bill = get_bill_data(db, ref_no, disco)
     history = get_history_from_db(db, ref_no, disco)
 
@@ -483,8 +462,6 @@ def get_comparison(request: Request, ref_no: str, disco: str = "fesco", db: Sess
 @limiter.limit("15/minute")
 def get_savings(request: Request, ref_no: str, disco: str = "fesco", db: Session = Depends(get_db)):
     ref_no, disco = validate_inputs(ref_no, disco)
-    
-    # 🔥 Fast cache use karo
     bill = get_bill_data(db, ref_no, disco)
 
     savings = calculate_slab_savings(bill["current_units"])
@@ -502,8 +479,6 @@ def get_savings(request: Request, ref_no: str, disco: str = "fesco", db: Session
 @limiter.limit("5/minute")
 def download_pdf(request: Request, ref_no: str, disco: str = "fesco", db: Session = Depends(get_db)):
     ref_no, disco = validate_inputs(ref_no, disco)
-    
-    # 🔥 Fast cache use karo
     bill = get_bill_data(db, ref_no, disco)
     history = get_history_from_db(db, ref_no, disco)
 
@@ -562,4 +537,3 @@ def get_ml_prediction(request: Request, ref_no: str, disco: str = "fesco", db: S
         "disco": disco,
         **result,
     }
-    
