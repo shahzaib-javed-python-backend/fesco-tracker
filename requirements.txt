@@ -9,6 +9,7 @@ aiofiles==24.1.0
 reportlab==4.2.5
 python-dotenv==1.0.1
 sqlalchemy==2.0.35
+psycopg2-binary==2.9.9
 alembic==1.13.3
 pandas==2.2.3
 numpy==2.1.3

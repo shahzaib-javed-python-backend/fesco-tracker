@@ -9,10 +9,14 @@ class Base(DeclarativeBase):
 
 
 # Engine — database connection
+db_url = settings.database_url
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
+
 engine = create_engine(
-    settings.database_url,
-    connect_args={"check_same_thread": False} if "sqlite" in settings.database_url else {},
-    echo=settings.debug,  # True hone pe SQL queries print hongi
+    db_url,
+    connect_args={"check_same_thread": False} if "sqlite" in db_url else {},
+    echo=settings.debug,
 )
 
 
