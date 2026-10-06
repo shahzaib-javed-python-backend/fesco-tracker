@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     debug: bool = False
     demo_mode: bool = False
     public_base_url: str = "http://localhost:8000"
+    public_history_enabled: bool = False
     
     # Database
     database_url: str = "sqlite:///./fesco_tracker.db"

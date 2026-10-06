@@ -53,12 +53,13 @@ def _is_local() -> bool:
     return hostname in local_hosts or hostname.startswith("desktop") or hostname.startswith("laptop")
 
 
-IS_LOCAL = _is_local()
+IS_LOCAL = DEBUG
 
 ALLOWED_ORIGINS = os.getenv(
     "ALLOWED_ORIGINS",
     "http://localhost:8000,http://127.0.0.1:8000"
 ).split(",")
+ALLOWED_ORIGINS = [origin.strip() for origin in ALLOWED_ORIGINS if origin.strip()]
 
 
 # ============================================================
@@ -89,7 +90,16 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
-        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com; "
+            "img-src 'self' data:; connect-src 'self'; "
+            "frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+        )
+        if request.url.scheme == "https" and not DEBUG:
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         return response
 
 
@@ -115,6 +125,11 @@ app.add_middleware(SlowAPIMiddleware)
 
 VALID_DISCOS = {"fesco", "lesco", "gepco", "mepco", "iesco",
                 "pesco", "hesco", "qesco", "sepco", "tesco"}
+
+
+def require_public_history() -> None:
+    if not settings.public_history_enabled:
+        raise HTTPException(status_code=403, detail="Public search history is disabled")
 
 
 def validate_inputs(ref_no: str, disco: str = "fesco") -> tuple:
@@ -282,6 +297,7 @@ def sitemap():
 @app.get("/db/search-history")
 @limiter.limit("30/minute")
 def get_search_history(request: Request, db: Session = Depends(get_db), limit: int = 20):
+    require_public_history()
     limit = min(max(1, limit), 100)
     searches = db.query(SearchHistory)\
         .order_by(SearchHistory.searched_at.desc())\
@@ -324,6 +340,7 @@ def export_history(request: Request, ref_no: str, disco: str = "fesco", db: Sess
 @app.get("/db/popular-searches")
 @limiter.limit("30/minute")
 def get_popular_searches(request: Request, db: Session = Depends(get_db), limit: int = 5):
+    require_public_history()
     from sqlalchemy import func
 
     limit = min(max(1, limit), 20)
@@ -341,6 +358,7 @@ def get_popular_searches(request: Request, db: Session = Depends(get_db), limit:
 @app.get("/db/cache-stats")
 @limiter.limit("30/minute")
 def get_cache_stats(request: Request, db: Session = Depends(get_db)):
+    require_public_history()
     total_cached = db.query(CachedBill).count()
     total_searches = db.query(SearchHistory).count()
 

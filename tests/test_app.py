@@ -75,6 +75,17 @@ def test_history_can_be_exported_as_csv(monkeypatch):
     assert export.text.startswith("month,units,bill,payment")
 
 
+def test_security_headers_and_private_history_default():
+    client = TestClient(app)
+    response = client.get("/health")
+
+    assert response.headers["content-security-policy"].startswith("default-src")
+    assert "strict-transport-security" not in response.headers
+    assert client.get("/db/search-history").status_code == 403
+    assert client.get("/db/popular-searches").status_code == 403
+    assert client.get("/db/cache-stats").status_code == 403
+
+
 def test_demo_bill_supports_analytics_and_ml(monkeypatch):
     monkeypatch.setattr(settings, "demo_mode", True)
     client = TestClient(app)
