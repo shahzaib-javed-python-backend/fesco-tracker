@@ -1,5 +1,7 @@
 # ⚡ FESCO Bill Tracker
 
+> 🎥 **[Watch the Project Demo Video on Facebook](https://www.facebook.com/reel/1675544374196516)** to see the FastAPI backend, caching, and ML predictions in action!
+
 A production-grade Python backend for tracking live electricity bills across 10 Pakistani DISCOs with ML-based prediction and advanced analytics.
 
 ## ✨ Features
@@ -75,10 +77,3 @@ pip install -r requirements.txt
 
 # Run server
 uvicorn app.main:app --reload
-```
-
-## Production Configuration
-
-Copy `.env.example` to `.env` before deployment. Keep `DEMO_MODE=False` in production so unavailable live bills are never represented with sample data. Set `PUBLIC_BASE_URL` to the public HTTPS URL so the generated sitemap points to the correct domain.
-
-This is an independent bill-tracking service and is not the official FESCO website. Users should verify final bill information through official FESCO or PITC channels.
